@@ -1,3 +1,4 @@
+// Package nfasimulator defines the rules for walking(simulating) an NFA
 package nfasimulator
 
 import (
@@ -129,11 +130,13 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 			thread1 := thread{
 				state:     st.Branch1,
 				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures}
+				captures:  currentTask.thread.captures,
+			}
 			thread2 := thread{
 				state:     st.Branch2,
 				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures}
+				captures:  currentTask.thread.captures,
+			}
 			stack = append(stack, task{
 				isRevert: false,
 				thread:   thread2,
@@ -154,7 +157,8 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 			nextThread := thread{
 				state:     st.Out,
 				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures}
+				captures:  currentTask.thread.captures,
+			}
 
 			stack = append(stack, task{
 				isRevert: true,
@@ -175,7 +179,8 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 			nextThread := thread{
 				state:     st.Out,
 				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures}
+				captures:  currentTask.thread.captures,
+			}
 
 			stack = append(stack, task{
 				isRevert: true,
@@ -190,7 +195,8 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 				nextThread := thread{
 					state:     st.Out,
 					lineIndex: currentTask.thread.lineIndex,
-					captures:  currentTask.thread.captures}
+					captures:  currentTask.thread.captures,
+				}
 				stack = append(stack, task{
 					isRevert: false,
 					thread:   nextThread,
@@ -201,7 +207,8 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 				nextThread := thread{
 					state:     st.Out,
 					lineIndex: currentTask.thread.lineIndex,
-					captures:  currentTask.thread.captures}
+					captures:  currentTask.thread.captures,
+				}
 				stack = append(stack, task{
 					isRevert: false,
 					thread:   nextThread,

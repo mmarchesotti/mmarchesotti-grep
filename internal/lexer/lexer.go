@@ -1,3 +1,4 @@
+// Package lexer defines the tokenizing logic
 package lexer
 
 import (

@@ -1,3 +1,4 @@
+// Package parser defines the parsing rules for generating an AST
 package parser
 
 import (

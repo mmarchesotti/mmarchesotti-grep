@@ -1,4 +1,3 @@
-// Create this file right next to your main.go
 package main
 
 import (

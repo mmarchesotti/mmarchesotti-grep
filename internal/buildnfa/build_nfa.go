@@ -1,3 +1,4 @@
+// Package buildnfa defines the logic for building an NFA
 package buildnfa
 
 import (

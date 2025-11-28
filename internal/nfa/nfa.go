@@ -1,3 +1,4 @@
+// Package nfa defines the structure of an NFA
 package nfa
 
 import "github.com/mmarchesotti/build-your-own-grep/internal/matcher"

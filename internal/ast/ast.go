@@ -1,3 +1,4 @@
+// Package ast defines the structure of an AST
 package ast
 
 import predefinedclass "github.com/mmarchesotti/build-your-own-grep/internal/predefinedclass"

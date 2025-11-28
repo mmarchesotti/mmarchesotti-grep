@@ -1,3 +1,4 @@
+// Package token defines the types of tokens used when tokenizing an input
 package token
 
 import "github.com/mmarchesotti/build-your-own-grep/internal/predefinedclass"
@@ -5,7 +6,7 @@ import "github.com/mmarchesotti/build-your-own-grep/internal/predefinedclass"
 type TokenType string
 
 const (
-	INVALID             TokenType = "INVALID"
+	invalid             TokenType = "INVALID"
 	LITERAL             TokenType = "LITERAL"
 	DIGIT               TokenType = "DIGIT"
 	ALPHANUMERIC        TokenType = "ALPHANUMERIC"
@@ -81,32 +82,38 @@ func (token *baseToken) getType() string {
 	return string(token.pType)
 }
 
+// OPERATORS
+
+type (
+	Concatenation      struct{ baseToken }
+	KleeneClosure      struct{ baseToken }
+	PositiveClosure    struct{ baseToken }
+	OptionalQuantifier struct{ baseToken }
+	Alternation        struct{ baseToken }
+)
+
+// OPERANDS
+
 type Literal struct {
 	baseToken
 	Literal rune
 }
-type Digit struct{ baseToken }
-type AlphaNumeric struct{ baseToken }
-type CharacterSet struct {
-	baseToken
-	IsPositive       bool
-	Literals         []rune
-	Ranges           [][2]rune
-	CharacterClasses []predefinedclass.PredefinedClass
-}
-type StartAnchor struct{ baseToken }
-type EndAnchor struct{ baseToken }
-type Wildcard struct{ baseToken }
-type GroupingOpener struct{ baseToken }
-type GroupingCloser struct{ baseToken }
+type (
+	Digit        struct{ baseToken }
+	AlphaNumeric struct{ baseToken }
+	CharacterSet struct {
+		baseToken
+		IsPositive       bool
+		Literals         []rune
+		Ranges           [][2]rune
+		CharacterClasses []predefinedclass.PredefinedClass
+	}
+)
 
-type Concatenation struct{ baseToken }
-type KleeneClosure struct{ baseToken }
-type PositiveClosure struct{ baseToken }
-type OptionalQuantifier struct{ baseToken }
-type Alternation struct{ baseToken }
-
-type BackReference struct {
-	baseToken
-	GroupIndex int
-}
+type (
+	StartAnchor    struct{ baseToken }
+	EndAnchor      struct{ baseToken }
+	Wildcard       struct{ baseToken }
+	GroupingOpener struct{ baseToken }
+	GroupingCloser struct{ baseToken }
+)

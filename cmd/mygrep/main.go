@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -65,7 +66,6 @@ func main() {
 
 			return nil
 		})
-
 		if err != nil {
 			fmt.Printf("error walking the path %q: %v\n", directory, err)
 		}
@@ -85,7 +85,14 @@ func main() {
 			var out bytes.Buffer
 			out.Write(line)
 			out.WriteByte('\n')
-			os.Stdout.Write(out.Bytes())
+			n, err := os.Stdout.Write(out.Bytes())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error: writing to stdout: %v\n", err)
+				os.Exit(2)
+			}
+			if n != len(out.Bytes()) {
+				fmt.Fprintf(os.Stderr, "warning: only %d of %d bytes written to stdout\n", n, len(out.Bytes()))
+			}
 		}
 	} else {
 		for _, filename := range filenames {
@@ -94,7 +101,9 @@ func main() {
 				fmt.Fprintf(os.Stderr, "error: could not read file %s: %v\n", filename, err)
 				os.Exit(2)
 			}
-			defer file.Close()
+			defer func() {
+				err = errors.Join(err, file.Close())
+			}()
 
 			hasMatch, matchedLines, err := processLines(file, pattern)
 			if err != nil {
@@ -108,7 +117,14 @@ func main() {
 				out.WriteByte(':')
 				out.Write(line)
 				out.WriteByte('\n')
-				os.Stdout.Write(out.Bytes())
+				n, err := os.Stdout.Write(out.Bytes())
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: writing to stdout: %v\n", err)
+					os.Exit(2)
+				}
+				if n != len(out.Bytes()) {
+					fmt.Fprintf(os.Stderr, "warning: only %d of %d bytes written to stdout\n", n, len(out.Bytes()))
+				}
 			}
 		}
 	}

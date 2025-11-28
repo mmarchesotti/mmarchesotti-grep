@@ -1,6 +1,10 @@
+// Package matcher defines the rules for matching different types of runes
 package matcher
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 func isDigit(r rune) bool {
 	return r >= '0' && r <= '9'
@@ -54,10 +58,8 @@ type CharacterSetMatcher struct {
 }
 
 func (p *CharacterSetMatcher) Match(r rune) (bool, error) {
-	for _, literal := range p.Literals {
-		if r == literal {
-			return p.IsPositive, nil
-		}
+	if slices.Contains(p.Literals, r) {
+		return p.IsPositive, nil
 	}
 	for _, rng := range p.Ranges {
 		m, err := match(r, rng)
