@@ -1,16 +1,48 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/mmarchesotti/build-your-own-grep/internal/buildnfa"
+	"github.com/mmarchesotti/build-your-own-grep/internal/lexer"
 	"github.com/mmarchesotti/build-your-own-grep/internal/nfasimulator"
+	"github.com/mmarchesotti/build-your-own-grep/internal/parser"
 )
 
+// helper function to encapsulate the Lex -> Parse -> Build -> Simulate pipeline
+// used in the main.go logic.
+func compileAndMatch(line []byte, pattern string) (bool, []nfasimulator.Capture, error) {
+	tokens, tokenizeErr := lexer.Tokenize(pattern)
+	if tokenizeErr != nil {
+		return false, nil, tokenizeErr
+	}
+
+	tree, captureCount, parseErr := parser.Parse(tokens)
+	if parseErr != nil {
+		return false, nil, parseErr
+	}
+
+	fragment, buildErr := buildnfa.Build(tree)
+	if buildErr != nil {
+		return false, nil, buildErr
+	}
+
+	capturesChan, simulationErr := nfasimulator.Simulate(line, fragment, captureCount)
+	if simulationErr != nil {
+		return false, nil, simulationErr
+	}
+
+	// Read from the channel to get the result
+	capturedSlice, ok := <-capturesChan
+	return ok, capturedSlice, nil
+}
+
 func TestMatchLine(t *testing.T) {
-	// --- Existing test cases, now just checking for match/no-match ---
+	// --- Existing test cases ---
 	basicTestCases := []struct {
 		name          string
 		line          []byte
@@ -135,8 +167,8 @@ func TestMatchLine(t *testing.T) {
 
 	for _, tc := range basicTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Updated call to Simulate, ignoring the captures slice
-			actualMatch, err := nfasimulator.Simulate(tc.line, tc.pattern)
+			// Use the helper to process the pipeline
+			actualMatch, _, err := compileAndMatch(tc.line, tc.pattern)
 			if err != nil {
 				t.Errorf("error '%s':", err)
 			}
@@ -148,7 +180,7 @@ func TestMatchLine(t *testing.T) {
 		})
 	}
 
-	// --- New test cases specifically for validating captures ---
+	// --- Test cases specifically for validating captures ---
 	captureTestCases := []struct {
 		name             string
 		line             []byte
@@ -218,7 +250,7 @@ func TestMatchLine(t *testing.T) {
 
 	for _, tc := range captureTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualMatch, actualCaptures, err := nfasimulator.Simulate(tc.line, tc.pattern)
+			actualMatch, actualCaptures, err := compileAndMatch(tc.line, tc.pattern)
 			if err != nil {
 				t.Errorf("error '%s':", err)
 			}
@@ -228,6 +260,7 @@ func TestMatchLine(t *testing.T) {
 					tc.pattern, string(tc.line), tc.expectedMatch, actualMatch)
 			}
 
+			// For captures, we need to check the actual data returned from the channel
 			if !reflect.DeepEqual(actualCaptures, tc.expectedCaptures) {
 				t.Errorf("Pattern '%s' on line '%s': incorrect captures", tc.pattern, string(tc.line))
 				t.Errorf("  got: %v", actualCaptures)
@@ -293,27 +326,38 @@ func TestSimulateWithFile(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// This test function reads the whole file into a byte slice,
-			// so it doesn't correctly test line-by-line matching.
-			// However, we can adapt the Simulate call.
-			// A true grep would iterate line by line.
 			filePath := createTestFile(t, tc.fileContent)
 
-			fileBytes, err := os.ReadFile(filePath)
+			file, err := os.Open(filePath)
 			if err != nil {
-				t.Fatalf("Failed to read temp file %s: %v", filePath, err)
+				t.Fatalf("Failed to open temp file %s: %v", filePath, err)
+			}
+			defer file.Close()
+
+			// Mimic main.go logic: Read the file line by line
+			scanner := bufio.NewScanner(file)
+			anyMatchFound := false
+
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				// Use the pipeline helper
+				ok, _, err := compileAndMatch(line, tc.pattern)
+				if err != nil {
+					t.Fatalf("Processing error: %v", err)
+				}
+				if ok {
+					anyMatchFound = true
+					break // Found a match in the file, we can stop
+				}
 			}
 
-			// NOTE: This tests the pattern against the entire file content at once.
-			// Updated call to Simulate, ignoring the captures slice
-			captures, err := nfasimulator.Simulate(fileBytes, tc.pattern)
-			if err != nil {
-				t.Errorf("Simulate returned an unexpected error: %v", err)
+			if err := scanner.Err(); err != nil {
+				t.Fatalf("Scanner error: %v", err)
 			}
-			_, actualMatch := <- captures
-			if actualMatch != tc.expectedMatch {
-				t.Errorf("Pattern '%s' on file with content '%s': expected match %v, but got %v",
-					tc.pattern, tc.fileContent, tc.expectedMatch, actualMatch)
+
+			if anyMatchFound != tc.expectedMatch {
+				t.Errorf("Pattern '%s' on file content: expected match %v, but got %v",
+					tc.pattern, tc.expectedMatch, anyMatchFound)
 			}
 		})
 	}
@@ -323,10 +367,9 @@ func createTestFile(t *testing.T, content string) string {
 	t.Helper()
 
 	tempDir := t.TempDir()
-
 	filePath := filepath.Join(tempDir, "testfile.txt")
 
-	err := os.WriteFile(filePath, []byte(content), 0666)
+	err := os.WriteFile(filePath, []byte(content), 0o666)
 	if err != nil {
 		t.Fatalf("Failed to write to temporary file %s: %v", filePath, err)
 	}

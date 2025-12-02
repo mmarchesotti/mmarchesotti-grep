@@ -35,7 +35,7 @@ type undoEntry struct {
 	oldValue     int
 }
 
-func Simulate(line []byte, fragment nfa.Fragment, captureCount int) (<-chan Capture, error) {
+func Simulate(line []byte, fragment nfa.Fragment, captureCount int) (<-chan []Capture, error) {
 	out := make(chan []Capture)
 
 	go func() {
@@ -43,16 +43,27 @@ func Simulate(line []byte, fragment nfa.Fragment, captureCount int) (<-chan Capt
 
 		searchIndex := 0
 		for searchIndex <= len(line) {
-			captures, found := findMatchAt(fragment.Start, line, searchIndex, captureCount)
 
-			if found {
-				out <- MatchResult{Captures: captures}
+			stream := findMatchAt(fragment.Start, line, searchIndex, captureCount)
 
-				endOfMatch := captures[1]
-				if endOfMatch == searchIndex {
-					searchIndex++
+			foundAnyAtThisIndex := false
+			maxEndIndex := searchIndex
+
+			for match := range stream {
+				foundAnyAtThisIndex = true
+
+				if match[0].End > maxEndIndex {
+					maxEndIndex = match[0].End
+				}
+
+				out <- match
+			}
+
+			if foundAnyAtThisIndex {
+				if maxEndIndex > searchIndex {
+					searchIndex = maxEndIndex
 				} else {
-					searchIndex = endOfMatch
+					searchIndex++
 				}
 			} else {
 				searchIndex++
@@ -61,63 +72,157 @@ func Simulate(line []byte, fragment nfa.Fragment, captureCount int) (<-chan Capt
 	}()
 
 	return out, nil
-
 }
 
-func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount int) (chan <- []Capture, bool) {
-	stack := []task{}
+func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount int) <-chan []Capture {
+	out := make(chan []Capture)
 
-	initialCaptures := make([]Capture, captureCount)
-	for i := range initialCaptures {
-		initialCaptures[i] = Capture{Start: -1, End: -1}
-	}
+	go func() {
+		defer close(out)
+		stack := []task{}
 
-	initialThread := thread{
-		state:     startState,
-		lineIndex: startIndex,
-		captures:  initialCaptures,
-	}
-	stack = append(stack, task{
-		isRevert: false,
-		thread:   initialThread,
-		undoLog:  nil,
-	})
+		initialCaptures := make([]Capture, captureCount)
+		for i := range initialCaptures {
+			initialCaptures[i] = Capture{Start: -1, End: -1}
+		}
 
-	visited := make(map[string]bool)
+		initialThread := thread{
+			state:     startState,
+			lineIndex: startIndex,
+			captures:  initialCaptures,
+		}
+		stack = append(stack, task{
+			isRevert: false,
+			thread:   initialThread,
+			undoLog:  nil,
+		})
 
-	for len(stack) > 0 {
-		currentTask := stack[len(stack)-1]
-		stack = stack[:len(stack)-1]
+		visited := make(map[string]bool)
 
-		if currentTask.isRevert {
-			for _, entry := range currentTask.undoLog {
-				if entry.isStart {
-					currentTask.thread.captures[entry.captureIndex].Start = entry.oldValue
-				} else {
-					currentTask.thread.captures[entry.captureIndex].End = entry.oldValue
+		for len(stack) > 0 {
+			currentTask := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			if currentTask.isRevert {
+				for _, entry := range currentTask.undoLog {
+					if entry.isStart {
+						currentTask.thread.captures[entry.captureIndex].Start = entry.oldValue
+					} else {
+						currentTask.thread.captures[entry.captureIndex].End = entry.oldValue
+					}
 				}
+				continue
 			}
-			continue
-		}
 
-		threadKey := currentTask.thread.key()
-		if visited[threadKey] {
-			continue
-		}
-		visited[threadKey] = true
+			threadKey := currentTask.thread.key()
+			if visited[threadKey] {
+				continue
+			}
+			visited[threadKey] = true
 
-		currentState := currentTask.thread.state
-		switch st := currentState.(type) {
-		case *nfa.AcceptingState:
-			out <- currentTask.thread.captures, true
-		case *nfa.MatcherState:
-			if currentTask.thread.lineIndex < len(line) {
-				r, size := utf8.DecodeRune(line[currentTask.thread.lineIndex:])
-				match, _ := st.Matcher.Match(r)
-				if match {
+			currentState := currentTask.thread.state
+			switch st := currentState.(type) {
+			case *nfa.AcceptingState:
+				resultCopy := copyCaptures(currentTask.thread.captures)
+				out <- resultCopy
+				continue
+			case *nfa.MatcherState:
+				if currentTask.thread.lineIndex < len(line) {
+					r, size := utf8.DecodeRune(line[currentTask.thread.lineIndex:])
+					match, _ := st.Matcher.Match(r)
+					if match {
+						nextThread := thread{
+							state:     st.Out,
+							lineIndex: currentTask.thread.lineIndex + size,
+							captures:  currentTask.thread.captures,
+						}
+						stack = append(stack, task{
+							isRevert: false,
+							thread:   nextThread,
+						})
+					}
+				}
+			case *nfa.SplitState:
+				thread1 := thread{
+					state:     st.Branch1,
+					lineIndex: currentTask.thread.lineIndex,
+					captures:  currentTask.thread.captures,
+				}
+				thread2 := thread{
+					state:     st.Branch2,
+					lineIndex: currentTask.thread.lineIndex,
+					captures:  currentTask.thread.captures,
+				}
+				stack = append(stack, task{
+					isRevert: false,
+					thread:   thread2,
+				})
+				stack = append(stack, task{
+					isRevert: false,
+					thread:   thread1,
+				})
+			case *nfa.CaptureStartState:
+				undo := undoEntry{
+					captureIndex: st.GroupIndex,
+					isStart:      true,
+					oldValue:     currentTask.thread.captures[st.GroupIndex].Start,
+				}
+
+				currentTask.thread.captures[st.GroupIndex].Start = currentTask.thread.lineIndex
+
+				nextThread := thread{
+					state:     st.Out,
+					lineIndex: currentTask.thread.lineIndex,
+					captures:  currentTask.thread.captures,
+				}
+
+				stack = append(stack, task{
+					isRevert: true,
+					thread:   currentTask.thread, undoLog: []undoEntry{undo},
+				})
+				stack = append(stack, task{
+					isRevert: false,
+					thread:   nextThread,
+				})
+			case *nfa.CaptureEndState:
+				undo := undoEntry{
+					captureIndex: st.GroupIndex,
+					isStart:      false,
+					oldValue:     currentTask.thread.captures[st.GroupIndex].End,
+				}
+				currentTask.thread.captures[st.GroupIndex].End = currentTask.thread.lineIndex
+
+				nextThread := thread{
+					state:     st.Out,
+					lineIndex: currentTask.thread.lineIndex,
+					captures:  currentTask.thread.captures,
+				}
+
+				stack = append(stack, task{
+					isRevert: true,
+					thread:   currentTask.thread, undoLog: []undoEntry{undo},
+				})
+				stack = append(stack, task{
+					isRevert: false,
+					thread:   nextThread,
+				})
+			case *nfa.StartAnchorState:
+				if currentTask.thread.lineIndex == 0 {
 					nextThread := thread{
 						state:     st.Out,
-						lineIndex: currentTask.thread.lineIndex + size,
+						lineIndex: currentTask.thread.lineIndex,
+						captures:  currentTask.thread.captures,
+					}
+					stack = append(stack, task{
+						isRevert: false,
+						thread:   nextThread,
+					})
+				}
+			case *nfa.EndAnchorState:
+				if currentTask.thread.lineIndex == len(line) {
+					nextThread := thread{
+						state:     st.Out,
+						lineIndex: currentTask.thread.lineIndex,
 						captures:  currentTask.thread.captures,
 					}
 					stack = append(stack, task{
@@ -126,96 +231,16 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 					})
 				}
 			}
-		case *nfa.SplitState:
-			thread1 := thread{
-				state:     st.Branch1,
-				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures,
-			}
-			thread2 := thread{
-				state:     st.Branch2,
-				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures,
-			}
-			stack = append(stack, task{
-				isRevert: false,
-				thread:   thread2,
-			})
-			stack = append(stack, task{
-				isRevert: false,
-				thread:   thread1,
-			})
-		case *nfa.CaptureStartState:
-			undo := undoEntry{
-				captureIndex: st.GroupIndex,
-				isStart:      true,
-				oldValue:     currentTask.thread.captures[st.GroupIndex].Start,
-			}
-
-			currentTask.thread.captures[st.GroupIndex].Start = currentTask.thread.lineIndex
-
-			nextThread := thread{
-				state:     st.Out,
-				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures,
-			}
-
-			stack = append(stack, task{
-				isRevert: true,
-				thread:   currentTask.thread, undoLog: []undoEntry{undo},
-			})
-			stack = append(stack, task{
-				isRevert: false,
-				thread:   nextThread,
-			})
-		case *nfa.CaptureEndState:
-			undo := undoEntry{
-				captureIndex: st.GroupIndex,
-				isStart:      false,
-				oldValue:     currentTask.thread.captures[st.GroupIndex].End,
-			}
-			currentTask.thread.captures[st.GroupIndex].End = currentTask.thread.lineIndex
-
-			nextThread := thread{
-				state:     st.Out,
-				lineIndex: currentTask.thread.lineIndex,
-				captures:  currentTask.thread.captures,
-			}
-
-			stack = append(stack, task{
-				isRevert: true,
-				thread:   currentTask.thread, undoLog: []undoEntry{undo},
-			})
-			stack = append(stack, task{
-				isRevert: false,
-				thread:   nextThread,
-			})
-		case *nfa.StartAnchorState:
-			if currentTask.thread.lineIndex == 0 {
-				nextThread := thread{
-					state:     st.Out,
-					lineIndex: currentTask.thread.lineIndex,
-					captures:  currentTask.thread.captures,
-				}
-				stack = append(stack, task{
-					isRevert: false,
-					thread:   nextThread,
-				})
-			}
-		case *nfa.EndAnchorState:
-			if currentTask.thread.lineIndex == len(line) {
-				nextThread := thread{
-					state:     st.Out,
-					lineIndex: currentTask.thread.lineIndex,
-					captures:  currentTask.thread.captures,
-				}
-				stack = append(stack, task{
-					isRevert: false,
-					thread:   nextThread,
-				})
-			}
 		}
-	}
+	}()
 
-	return nil, false
+	return nil
+}
+
+func copyCaptures(src []Capture) []Capture {
+	dst := make([]Capture, len(src))
+
+	copy(dst, src)
+
+	return dst
 }
