@@ -234,7 +234,7 @@ func findMatchAt(startState nfa.State, line []byte, startIndex int, captureCount
 		}
 	}()
 
-	return nil
+	return out
 }
 
 func copyCaptures(src []Capture) []Capture {
