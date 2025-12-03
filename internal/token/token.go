@@ -5,24 +5,6 @@ import "github.com/mmarchesotti/build-your-own-grep/internal/predefinedclass"
 
 type TokenType string
 
-const (
-	invalid             TokenType = "INVALID"
-	LITERAL             TokenType = "LITERAL"
-	DIGIT               TokenType = "DIGIT"
-	ALPHANUMERIC        TokenType = "ALPHANUMERIC"
-	CHARACTER_SET       TokenType = "CHARACTER_SET"
-	START_ANCHOR        TokenType = "START_ANCHOR"
-	END_ANCHOR          TokenType = "END_ANCHOR"
-	KLEENE_CLOSURE      TokenType = "KLEENE_CLOSURE"
-	POSITIVE_CLOSURE    TokenType = "POSITIVE_CLOSURE"
-	OPTIONAL_QUANTIFIER TokenType = "OPTIONAL_QUANTIFIER"
-	WILDCARD            TokenType = "WILDCARD"
-	ALTERNATION         TokenType = "ALTERNATION"
-	CONCATENATION       TokenType = "CONCATENATION"
-	GROUPING_OPENER     TokenType = "GROUPING_OPENER"
-	GROUPING_CLOSER     TokenType = "GROUPING_CLOSER"
-)
-
 // --- Helper Functions ---
 
 func IsAlternation(t Token) bool {
@@ -82,25 +64,23 @@ func (token *baseToken) getType() string {
 	return string(token.pType)
 }
 
-// OPERATORS
-
 type (
 	Concatenation      struct{ baseToken }
 	KleeneClosure      struct{ baseToken }
 	PositiveClosure    struct{ baseToken }
 	OptionalQuantifier struct{ baseToken }
 	Alternation        struct{ baseToken }
-)
-
-// OPERANDS
-
-type Literal struct {
-	baseToken
-	Literal rune
-}
-type (
-	Digit        struct{ baseToken }
-	AlphaNumeric struct{ baseToken }
+	StartAnchor        struct{ baseToken }
+	EndAnchor          struct{ baseToken }
+	Wildcard           struct{ baseToken }
+	GroupingOpener     struct{ baseToken }
+	GroupingCloser     struct{ baseToken }
+	Digit              struct{ baseToken }
+	AlphaNumeric       struct{ baseToken }
+	Literal            struct {
+		baseToken
+		Literal rune
+	}
 	CharacterSet struct {
 		baseToken
 		IsPositive       bool
@@ -108,12 +88,8 @@ type (
 		Ranges           [][2]rune
 		CharacterClasses []predefinedclass.PredefinedClass
 	}
-)
-
-type (
-	StartAnchor    struct{ baseToken }
-	EndAnchor      struct{ baseToken }
-	Wildcard       struct{ baseToken }
-	GroupingOpener struct{ baseToken }
-	GroupingCloser struct{ baseToken }
+	BackReference struct {
+		baseToken
+		CaptureIndex int
+	}
 )
