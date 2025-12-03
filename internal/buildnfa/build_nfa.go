@@ -171,10 +171,9 @@ func processNode(n ast.ASTNode) (nfa.Fragment, error) {
 }
 
 func Build(tree ast.ASTNode) (nfa.Fragment, error) {
-
-	mainFrag, processErr := processNode(tree)
-	if processErr != nil {
-		return nfa.Fragment{}, processErr
+	mainFrag, err := processNode(tree)
+	if err != nil {
+		return nfa.Fragment{}, err
 	}
 
 	startState := &nfa.CaptureStartState{

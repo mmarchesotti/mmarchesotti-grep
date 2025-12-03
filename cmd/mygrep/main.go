@@ -163,24 +163,24 @@ func processLines(input io.Reader, pattern string) (bool, [][]byte, error) {
 }
 
 func matchLine(lineCopy []byte, pattern string) (bool, error) {
-	tokens, tokenizeErr := lexer.Tokenize(pattern)
-	if tokenizeErr != nil {
-		return false, tokenizeErr
+	tokens, err := lexer.Tokenize(pattern)
+	if err != nil {
+		return false, err
 	}
 
-	tree, captureCount, parseErr := parser.Parse(tokens)
-	if parseErr != nil {
-		return false, parseErr
+	tree, captureCount, err := parser.Parse(tokens)
+	if err != nil {
+		return false, err
 	}
 
-	fragment, buildErr := buildnfa.Build(tree)
-	if buildErr != nil {
-		return false, buildErr
+	fragment, err := buildnfa.Build(tree)
+	if err != nil {
+		return false, err
 	}
 
-	captures, simulationErr := nfasimulator.Simulate(lineCopy, fragment, captureCount)
-	if simulationErr != nil {
-		return false, fmt.Errorf("invalid pattern: %w", simulationErr)
+	captures, err := nfasimulator.Simulate(lineCopy, fragment, captureCount)
+	if err != nil {
+		return false, fmt.Errorf("invalid pattern: %w", err)
 	}
 
 	_, hasMatch := <-captures

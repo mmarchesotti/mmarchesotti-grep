@@ -130,19 +130,19 @@ func TestTokenize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, actualErr := Tokenize(tt.input)
+			actual, err := Tokenize(tt.input)
 
-			if actualErr != nil && tt.err == nil {
-				t.Fatalf("Tokenize() returned an unexpected error: %v", actualErr)
+			if err != nil && tt.err == nil {
+				t.Fatalf("Tokenize() returned an unexpected error: %v", err)
 			}
 
-			if actualErr == nil && tt.err != nil {
+			if err == nil && tt.err != nil {
 				t.Fatalf("Tokenize() expected error '%v', but got nil", tt.err)
 			}
 
-			if actualErr != nil && tt.err != nil {
-				if actualErr.Error() != tt.err.Error() {
-					t.Fatalf("Tokenize() expected error '%v', but got '%v'", tt.err, actualErr)
+			if err != nil && tt.err != nil {
+				if err.Error() != tt.err.Error() {
+					t.Fatalf("Tokenize() expected error '%v', but got '%v'", tt.err, err)
 				}
 				return
 			}

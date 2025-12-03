@@ -16,24 +16,24 @@ import (
 // helper function to encapsulate the Lex -> Parse -> Build -> Simulate pipeline
 // used in the main.go logic.
 func compileAndMatch(line []byte, pattern string) (bool, []nfasimulator.Capture, error) {
-	tokens, tokenizeErr := lexer.Tokenize(pattern)
-	if tokenizeErr != nil {
-		return false, nil, tokenizeErr
+	tokens, err := lexer.Tokenize(pattern)
+	if err != nil {
+		return false, nil, err
 	}
 
-	tree, captureCount, parseErr := parser.Parse(tokens)
-	if parseErr != nil {
-		return false, nil, parseErr
+	tree, captureCount, err := parser.Parse(tokens)
+	if err != nil {
+		return false, nil, err
 	}
 
-	fragment, buildErr := buildnfa.Build(tree)
-	if buildErr != nil {
-		return false, nil, buildErr
+	fragment, err := buildnfa.Build(tree)
+	if err != nil {
+		return false, nil, err
 	}
 
-	capturesChan, simulationErr := nfasimulator.Simulate(line, fragment, captureCount)
-	if simulationErr != nil {
-		return false, nil, simulationErr
+	capturesChan, err := nfasimulator.Simulate(line, fragment, captureCount)
+	if err != nil {
+		return false, nil, err
 	}
 
 	// Read from the channel to get the result

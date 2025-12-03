@@ -10,9 +10,11 @@ import (
 
 // --- Test Helper Functions ---
 func lit(char rune) ast.ASTNode { return &ast.LiteralNode{Literal: char} }
+
 func alt(left, right ast.ASTNode) ast.ASTNode {
 	return &ast.AlternationNode{Left: left, Right: right}
 }
+
 func concat(left, right ast.ASTNode) ast.ASTNode {
 	return &ast.ConcatenationNode{Left: left, Right: right}
 }
@@ -129,14 +131,14 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokens, tokenizeErr := lexer.Tokenize(tt.input)
-			if tokenizeErr != nil {
-				t.Fatalf("Tokenize() returned an unexpected error: %v", tokenizeErr)
+			tokens, err := lexer.Tokenize(tt.input)
+			if err != nil {
+				t.Fatalf("Tokenize() returned an unexpected error: %v", err)
 			}
 
-			actual, actualCount, parseErr := Parse(tokens)
-			if parseErr != nil {
-				t.Fatalf("Parse() returned an unexpected error: %v", parseErr)
+			actual, actualCount, err := Parse(tokens)
+			if err != nil {
+				t.Fatalf("Parse() returned an unexpected error: %v", err)
 			}
 
 			if actualCount != tt.expectedCount {
