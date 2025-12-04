@@ -45,6 +45,40 @@ func TestTokenize(t *testing.T) {
 				&token.Literal{Literal: '+'},
 			},
 		},
+		// --- NEW BACKREFERENCE TESTS ---
+		{
+			name:  "simple backreference",
+			input: `\1`,
+			expected: []token.Token{
+				&token.BackReference{CaptureIndex: 1},
+			},
+		},
+		{
+			name:  "multiple backreferences",
+			input: `\1\2`,
+			expected: []token.Token{
+				&token.BackReference{CaptureIndex: 1},
+				&token.BackReference{CaptureIndex: 2},
+			},
+		},
+		{
+			name:  "backreference with grouping",
+			input: `(a)\1`,
+			expected: []token.Token{
+				&token.GroupingOpener{},
+				&token.Literal{Literal: 'a'},
+				&token.GroupingCloser{},
+				&token.BackReference{CaptureIndex: 1},
+			},
+		},
+		{
+			name:  "high digit backreference",
+			input: `\9`,
+			expected: []token.Token{
+				&token.BackReference{CaptureIndex: 9},
+			},
+		},
+		// -------------------------------
 		{
 			name:  "escaped predefined classes",
 			input: `\d\w`,
