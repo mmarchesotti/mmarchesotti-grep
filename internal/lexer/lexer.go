@@ -27,8 +27,8 @@ func Tokenize(inputPattern string) ([]token.Token, error) {
 				newToken = &token.Digit{}
 			case 'w':
 				newToken = &token.AlphaNumeric{}
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				newToken = &token.BackReference{CaptureIndex: int(nextCharacter)}
+			case '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				newToken = &token.BackReference{CaptureIndex: int(nextCharacter - '0')}
 			default:
 				newToken = &token.Literal{Literal: rune(nextCharacter)}
 			}
