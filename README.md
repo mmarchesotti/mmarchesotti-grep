@@ -1,4 +1,4 @@
-# Go Grep: A Custom `grep` Implementation
+# Greppy: A Custom `grep` Implementation
 
 This project is a from-scratch implementation of the `grep` command-line utility in Go. It is designed to explore the principles of regular expression engines, including parsing, compilation, and execution using a Non-deterministic Finite Automaton (NFA).
 
